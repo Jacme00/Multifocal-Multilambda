@@ -1,5 +1,12 @@
 # -*- coding: utf-8 -*-
 """
+Created on Thu Jan  8 05:09:53 2026
+
+@author: zarkm
+"""
+
+# -*- coding: utf-8 -*-
+"""
 Created on Sun Jan  4 20:32:23 2026
 
 @author: zarkm
@@ -21,22 +28,25 @@ import pickle
 
 # ------
 R         = 4e-3
-Nr        = 200
+Nr        = 600
 r         = np.linspace(0, R, Nr)
 z         = np.linspace(0.03, 0.21, 150)
 lambda0   = 633e-9
 lambda1   = 532e-9
+lambda2   = 445e-9
 
-z0, z1, sigma, sigma1 = 0.07, 0.11, 1e-3, 1e-3
+z0, z1, z2, sigma, sigma1, sigma2 = 0.07, 0.11, 0.17, 1e-3, 1e-3, 1e-3
 I_des_raw = np.exp(-0.5 * ((z - z0)/sigma)**2)
-I_des1_raw = np.exp(-0.5 * ((z - z1)/sigma1)**2) #added new lambdas, new sigmas and new desired target intensity profiles
+I_des1_raw = np.exp(-0.5 * ((z - z1)/sigma1)**2) 
+I_des2_raw = np.exp(-0.5 * ((z - z2)/sigma2)**2) #added yet another new lambdas, new sigmas and new desired target intensity profiles
 area0_des = np.trapz(I_des_raw, z)
 area1_des = np.trapz(I_des1_raw, z)
+area2_des = np.trapz(I_des2_raw, z)
 
 
 # Normalized random coefficients in [0,1]
 coeffs_z_norm = np.random.rand(6)    # 6 Zernike terms
-coeffs_f_norm = np.random.rand(200)   #  Fourier terms
+coeffs_f_norm = np.random.rand(300)   #  Fourier terms
 coeffs_rbf_norm = np.random.rand(7) #  RBF terms
 
 
@@ -210,24 +220,29 @@ def bb_objective(x):
     cz, cf, cr = unpack(x)
     I0_sim = simulate_onaxis(cz, cf, cr, r, z, R, lambda0)
     I1_sim = simulate_onaxis(cz, cf, cr, r, z, R, lambda1)
+    I2_sim = simulate_onaxis(cz, cf, cr, r, z, R, lambda2)
     
     area0_sim = np.trapz(I0_sim, z)
     area1_sim = np.trapz(I1_sim, z)
-
+    area2_sim = np.trapz(I2_sim, z)
     
     eps = 1e-12
 
     # Normalize simulated curves by their own areas
     I0n = I0_sim / (area0_sim + eps)
     I1n = I1_sim / (area1_sim + eps)
+    I2n = I2_sim / (area2_sim + eps)
 
     # Normalize desired curves by their (constant) areas
     T0n = I_des_raw  / (area0_des + eps)
     T1n = I_des1_raw / (area1_des + eps)
-
+    T2n = I_des2_raw / (area2_des + eps)
+    
+    
     L0 = np.mean((I0n - T0n)**2)
     L1 = np.mean((I1n - T1n)**2)
-    return L0 + L1
+    L2 = np.mean((I2n - T2n)**2)
+    return L0 + L1 + L2
 
 # initial guess
 x0 = np.concatenate([coeffs_z_norm, coeffs_f_norm, coeffs_rbf_norm])
@@ -343,25 +358,34 @@ print(f"  Final best MSE = {res.fun:.6e}")
 cz_opt, cf_opt, cr_opt = unpack(res.x)
 I_opt1 = simulate_onaxis(cz_opt, cf_opt, cr_opt, r, z, R, lambda0)
 I_opt2 = simulate_onaxis(cz_opt, cf_opt, cr_opt, r, z, R, lambda1)
+I_opt3 = simulate_onaxis(cz_opt, cf_opt, cr_opt, r, z, R, lambda2)
 # (You can now plot I_opt vs. the target as before.)
 
 
 area_sim1 = np.trapz(I_opt1, z)
 area_sim2 = np.trapz(I_opt2, z)
+area_sim3 = np.trapz(I_opt3, z)
+
 area_des1 = np.trapz(I_des_raw, z)
 area_des2 = np.trapz(I_des1_raw, z)
+area_des3 = np.trapz(I_des2_raw, z)
+
 I_fin1    = I_des_raw * (area_sim1/area_des1)
 I_fin2    = I_des1_raw * (area_sim2/area_des2)
+I_fin3    = I_des2_raw * (area_sim3/area_des3)
+
 
 # 4) plot
 plt.figure(figsize=(8,4))
 plt.plot(z, I_opt1,   label='Best1')
 plt.plot(z, I_opt2,   label='Best2')
+plt.plot(z, I_opt3,   label='Best3')
+
 #plt.plot(z, I_smooth, label='savgol Smoothed', linewidth=2)
 #plt.plot(z, I_opt, label='Gaussianly Smoothed', linewidth=2)
 plt.plot(z, I_fin1, label='Desired Focus1 (area-matched)', linestyle='--', linewidth=2)
 plt.plot(z, I_fin2, label='Desired Focus2 (area-matched)', linestyle='--', linewidth=2)
-
+plt.plot(z, I_fin3, label='Desired Focus3 (area-matched)', linestyle='--', linewidth=2)
 
 plt.xlabel('Propagation distance $z$ (m)')
 plt.ylabel('Intensity I(r)\,dr$ (arb. units)')
@@ -408,15 +432,22 @@ vars_to_save = {
     'R'        : R,
     'lambda0'  : lambda0,
     'lambda1'  : lambda1,
+    'lambda2'  : lambda2,
 
     # desired target profiles
     'z0'        : z0,
     'z1'        : z1,
+    'z2'        : z2,
     'sigma'     : sigma,
     'sigma1'    : sigma1,
+    'sigma2'    : sigma2,
     'I_des0'    : I_des_raw,
     'I_des1'    : I_des1_raw,
-
+    'I_des2'    : I_des2_raw,
+    
+    
+    
+    
     # optimized coefficients
     'cz_opt'   : cz_opt,
     'cf_opt'   : cf_opt,
@@ -425,10 +456,13 @@ vars_to_save = {
     # optimized simulated curves
     'I_opt_lambda0' : I_opt1,
     'I_opt_lambda1' : I_opt2,
-
+    'I_opt_lambda2' : I_opt3,
+    
+    
     # area-matched target curves used for plotting
     'I_tar_lambda0' : I_fin1,
     'I_tar_lambda1' : I_fin2,
+    'I_tar_lambda2' : I_fin3,
 
     # final objective value
     'final_loss' : res.fun
@@ -436,7 +470,7 @@ vars_to_save = {
 
 
 # 2) Write to disk
-name='optimization_results2lambdas.pkl'
+name='optimization_results3lambdas.pkl'
 with open(name, 'wb') as f:
     pickle.dump(vars_to_save, f)
 
