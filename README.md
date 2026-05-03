@@ -83,8 +83,13 @@ The layout for this project is:
 ├── plotting.py
 ├── run_demo.py
 ├── results/
-│   ├── target_vs_optimized.png
-│   ├── doe_profile.png
-│   └── resolution_check.png
+│   ├── DOE1.png
+│   ├── DOE1_raw.png
+│   ├── DOE1profile.png
+│   ├── DOE1swapped_raw.png
+│   ├── simDOE1.png
+│   ├── sim_swapped.png
+│   ├── optimization_results3lambdasHR2.pkl
+│   └── optimization_results3lambdasHR2swapped.pkl
 └── archive/
-    └── original_full_pipeline.py
+    └── original untidy archives
