@@ -76,12 +76,15 @@ The layout for this project is:
 ```text
 .
 ├── README.md
-├── src/
-│   ├── model.py
-│   ├── optimize.py
-│   └── plotting.py
+├── basis.py
+├── simulation.py
+├── objective.py
+├── optimize.py
+├── plotting.py
+├── run_demo.py
 ├── results/
 │   ├── target_vs_optimized.png
-│   └── doe_profile.png
+│   ├── doe_profile.png
+│   └── resolution_check.png
 └── archive/
-    └── exploratory_scripts.py
+    └── original_full_pipeline.py
