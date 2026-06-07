@@ -13,9 +13,28 @@ from objective import unpack
 import matplotlib.pyplot as plt
 import pickle
 import config
+import matplotlib.pyplot as plt
+import time
+from plotting import quick_plot_saved_results
 
 
+eval_count = 0
+iter_count = 0
+best_loss = np.inf
 
+last_loss = None
+last_x = None
+
+last_iter_time = time.perf_counter()
+last_iter_eval = 0
+
+history = {
+    "iter": [],
+    "iter_time": [],
+    "iter_evals": [],
+    "iter_loss": [],
+    "iter_best_loss": [],
+}
 
 I_des_raw = np.exp(-0.5 * ((config.z - config.z0)/config.sigma)**2)
 I_des1_raw = np.exp(-0.5 * ((config.z - config.z1)/config.sigma1)**2) 
@@ -36,13 +55,61 @@ total_dim = sum(dims)
 
 
 def objective(x):
-    return bb_objective(
-        x, dims, config.r, config.z, config.R,
-        config.lambda0, config.lambda1, config.lambda2,
-        I_des_raw, I_des1_raw, I_des2_raw,
-        area0_des, area1_des, area2_des
+    global eval_count, best_loss, last_loss, last_x
+
+    val = bb_objective(
+        x,
+        dims,
+        config.r,
+        config.z,
+        config.R,
+        config.lambda0,
+        config.lambda1,
+        config.lambda2,
+        I_des_raw,
+        I_des1_raw,
+        I_des2_raw,
+        area0_des,
+        area1_des,
+        area2_des
     )
 
+    eval_count += 1
+    last_loss = val
+    last_x = x.copy()
+
+    if val < best_loss:
+        best_loss = val
+
+    return val
+
+def callback(xk):
+    global iter_count, last_iter_time, last_iter_eval
+
+    now = time.perf_counter()
+
+    iter_count += 1
+
+    iter_time = now - last_iter_time
+    iter_evals = eval_count - last_iter_eval
+
+    last_iter_time = now
+    last_iter_eval = eval_count
+
+    history["iter"].append(iter_count)
+    history["iter_time"].append(iter_time)
+    history["iter_evals"].append(iter_evals)
+    history["iter_loss"].append(last_loss)
+    history["iter_best_loss"].append(best_loss)
+
+    print(
+        f"iter {iter_count:4d} | "
+        f"time {iter_time:8.2f} s | "
+        f"evals {iter_evals:5d} | "
+        f"loss {last_loss:.6e} | "
+        f"best {best_loss:.6e}"
+    )   
+    
 # initial guess
 x0 = np.concatenate([coeffs_z_norm, coeffs_f_norm, coeffs_rbf_norm])
 
@@ -77,13 +144,14 @@ res = minimize(
     x0,
     method="L-BFGS-B",
     bounds=bounds,
+    callback=callback,
     options={
-        "maxiter": 300,
-        "maxfun": 200000,
-        "disp": True
+        "maxiter": 1000,
+        "maxfun": 500000,
+        "ftol": 1e-9,
+        "eps": 1e-4,
     }
 )
-
 
 print(res.message)
 print("nit:", getattr(res, "nit", None))
@@ -166,8 +234,22 @@ vars_to_save = {
 
 
 # 2) Write to disk
-name='optimization_results3lambdasHR2swapped1.pkl'
+name='optimization_results3lambdasHR2swapped1juny2.pkl'
 with open(name, 'wb') as f:
     pickle.dump(vars_to_save, f)
 
 print("All key variables saved to name")
+
+
+
+plt.figure(figsize=(8, 5))
+plt.plot(history["iter"], history["iter_time"], "o-")
+plt.xlabel("Optimizer iteration")
+plt.ylabel("Time per iteration [s]")
+plt.title("Time per optimizer iteration")
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+
+quick_plot_saved_results("optimization_results3lambdasHR2swapped1juny2.pkl")
